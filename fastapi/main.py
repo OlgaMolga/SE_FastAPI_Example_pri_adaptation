@@ -3,10 +3,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from transformers import pipeline
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
+
+
+class HealthResponse(BaseModel):
+    status: str = Field(examples=["ok"])
 
 
 class Item(BaseModel):
@@ -27,6 +31,11 @@ classifier = _build_classifier()
 @app.get("/")
 def root():
     return {"FastApi service started!"}
+
+
+@app.get("/health", response_model=HealthResponse)
+def health():
+    return HealthResponse(status="ok")
 
 
 @app.get("/{text}")
