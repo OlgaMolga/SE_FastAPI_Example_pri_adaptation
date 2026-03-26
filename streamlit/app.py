@@ -13,7 +13,14 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 DEFAULT_API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").strip()
 PREDICT_PATH = "/predict/"
+REQUEST_TIMEOUT = 120.0    
 
+def fetch_prediction(url: str, text: str):
+    """Длеает HTTP-запрос к API"""
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
+        response = client.post(url, json={"text": text.strip()})
+        response.raise_for_status()
+        return response.json()
 
 def _format_prediction(data: object) -> None:
     """Показывает ответ Hugging Face pipeline (список словарей с label/score)."""
@@ -64,15 +71,9 @@ def main() -> None:
     if submitted and (text or "").strip():
         url = api_base.rstrip("/") + PREDICT_PATH
         try:
-            with httpx.Client(timeout=120.0) as client:
-                response = client.post(url, json={"text": text.strip()})
-                response.raise_for_status()
-                payload = response.json()
+            payload = fetch_prediction(url, text)
         except httpx.HTTPStatusError as exc:
-            st.error(
-                f"HTTP {exc.response.status_code}: "
-                f"{exc.response.text[:500] or exc.response.reason_phrase}"
-            )
+            st.error(f"HTTP {exc.response.status_code}")
             return
         except httpx.RequestError as exc:
             st.error(
