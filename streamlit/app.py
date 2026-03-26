@@ -36,9 +36,17 @@ def handle_request(url: str, text: str):
     return None
 
 def render_prediction(data):
-    """Отображение результата"""
-    if isinstance(data, list) and data:
-        row = data[0]
+    """Отображение результата (метрики; формат API: {\"results\": [{label, score}, ...]})."""
+    rows = None
+    if isinstance(data, dict):
+        inner = data.get("results")
+        if isinstance(inner, list) and inner:
+            rows = inner
+    elif isinstance(data, list) and data:
+        rows = data
+
+    if rows:
+        row = rows[0]
         if isinstance(row, dict):
             label = row.get("label")
             score = row.get("score")
@@ -47,10 +55,12 @@ def render_prediction(data):
             if score is not None:
                 st.metric("Уверенность", f"{float(score):.4f}")
             return
+
     if isinstance(data, dict):
         st.json(data)
         return
     st.write(data)
+
 
 def render_sidebar():
     """UI сайдбара"""
