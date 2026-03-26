@@ -56,11 +56,6 @@ def health():
     return HealthResponse(status="ok")
 
 
-@app.get("/{text}")
-def get_params(text: str):
-    return classifier(text)
-
-
 @app.post("/predict/", response_model=PredictResponse)
 def predict(item: PredictRequest):
     raw = classifier(item.text)
