@@ -9,13 +9,14 @@ import httpx
 import streamlit as st
 from dotenv import load_dotenv
 
-from utils import build_url, extract_fastapi_error 
+from utils import build_url, extract_fastapi_error
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 DEFAULT_API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").strip()
 PREDICT_PATH = "/predict/"
-REQUEST_TIMEOUT = 120.0    
+REQUEST_TIMEOUT = 120.0
+
 
 def fetch_prediction(url: str, text: str):
     """Делает HTTP-запрос к API"""
@@ -23,6 +24,7 @@ def fetch_prediction(url: str, text: str):
         response = client.post(url, json={"text": text.strip()})
         response.raise_for_status()
         return response.json()
+
 
 def handle_request(url: str, text: str):
     """Обработка ошибок при запросе"""
@@ -38,6 +40,7 @@ def handle_request(url: str, text: str):
     except httpx.RequestError as exc:
         st.error(f"Сетевая ошибка: {exc!s}")
     return None
+
 
 def render_prediction(data):
     """Отображение результата (метрики; формат API: {\"results\": [{label, score}, ...]})."""
@@ -72,13 +75,15 @@ def render_sidebar():
     """UI сайдбара"""
     with st.sidebar:
         api_base = st.text_input("Базовый URL API", value=DEFAULT_API_BASE).strip()
-        st.markdown(f"Запрос: `POST {PREDICT_PATH}` · тело: `{{\"text\": \"...\"}}`")
+        st.markdown(f'Запрос: `POST {PREDICT_PATH}` · тело: `{{"text": "..."}}`')
         st.caption("По умолчанию из переменной `API_BASE_URL` в `.env` (см. `.env.example`).")
     return api_base
+
 
 def is_valid_text(text: str | None) -> bool:
     """Проверка текста"""
     return bool(text and text.strip())
+
 
 def main() -> None:
     st.set_page_config(
@@ -103,7 +108,7 @@ def main() -> None:
             st.warning("Введите непустой текст.")
             return
 
-        url = build_url(api_base, PREDICT_PATH) 
+        url = build_url(api_base, PREDICT_PATH)
         if not url:
             st.error("Некорректный URL API. Проверьте формат (например, http://127.0.0.1:8000).")
             return

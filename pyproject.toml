@@ -1,0 +1,27 @@
+[project]
+name = "se-fastapi-example"
+version = "0.0.0"
+description = "Учебный пример: FastAPI + Streamlit"
+readme = "ReadMe.MD"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["fastapi", "streamlit"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# Папки fastapi/ и streamlit/ в корне — не пакеты PyPI; иначе isort путает их с lib fastapi/streamlit.
+known-third-party = ["fastapi", "streamlit"]
+# Локальный модуль streamlit/utils.py — не пакет PyPI.
+known-first-party = ["utils"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI шаблон: Depends в объявлении параметра — нормальная практика фреймворка
+"fastapi/main.py" = ["B008"]

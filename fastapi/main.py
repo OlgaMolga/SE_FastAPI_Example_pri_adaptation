@@ -1,19 +1,18 @@
-import os
 import logging
+import os
 import time
 import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from transformers import pipeline
 
-# 1. Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -22,18 +21,18 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # --- Схемы данных ---
 
+
 class HealthResponse(BaseModel):
     status: str = Field(examples=["ok"])
 
 
 class PredictRequest(BaseModel):
-    # Валидация входа: ограничение длины текста
     text: str = Field(
         ...,
         min_length=1,
         max_length=500,
         description="Текст для анализа тональности",
-        examples=["I love this project!"]
+        examples=["I love this project!"],
     )
 
 
@@ -47,6 +46,7 @@ class PredictResponse(BaseModel):
 
 
 # --- Логика ---
+
 
 def _to_predict_response(raw) -> PredictResponse:
     if not raw:
@@ -66,7 +66,7 @@ def _build_classifier():
             return pipeline("sentiment-analysis", model=model_name)
         return pipeline("sentiment-analysis")
     except Exception as e:
-        logger.error(f"Failed to load model: {e}")
+        logger.error("Failed to load model: %s", e)
         return None
 
 
@@ -75,20 +75,28 @@ def _build_classifier():
 app = FastAPI(
     title="Sentiment Analysis API",
     description="API для классификации тональности текста с использованием Transformers",
-    version="1.0.0"
+    version="1.0.0",
 )
 
-classifier = _build_classifier()
+_classifier = None
+
+
+def get_classifier():
+    """Ленивая загрузка pipeline: импорт приложения не тянет модель (тесты, CI)."""
+    global _classifier
+    if _classifier is None:
+        _classifier = _build_classifier()
+    return _classifier
 
 
 # --- Middleware для наблюдаемости (Correlation ID) ---
+
 
 @app.middleware("http")
 async def add_process_time_and_correlation_id(request: Request, call_next):
     correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     start_time = time.time()
 
-    # Обработка запроса
     response = await call_next(request)
 
     process_time = time.time() - start_time
@@ -100,17 +108,18 @@ async def add_process_time_and_correlation_id(request: Request, call_next):
 
 # --- Эндпоинты ---
 
+
 @app.get("/", tags=["System"])
 def root():
     return {"message": "FastApi service started!"}
 
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
-def health():
-    if classifier is None:
+def health(clf=Depends(get_classifier)):
+    if clf is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model not loaded"
+            detail="Model not loaded",
         )
     return HealthResponse(status="ok")
 
@@ -120,36 +129,34 @@ def health():
     response_model=PredictResponse,
     tags=["ML Model"],
     summary="Анализ тональности",
-    response_description="Список меток тональности с оценками уверенности"
+    response_description="Список меток тональности с оценками уверенности",
 )
-def predict(item: PredictRequest):
-    # Наблюдаемость: логируем длину текста и начало запроса
-    logger.info(f"Processing request. Text length: {len(item.text)} characters.")
+def predict(item: PredictRequest, clf=Depends(get_classifier)):
+    logger.info("Processing request. Text length: %s characters.", len(item.text))
 
-    if classifier is None:
+    if clf is None:
         logger.error("Classifier is not initialized")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="ML model is currently unavailable"
+            detail="ML model is currently unavailable",
         )
 
     try:
-        # Обработка сбоев модели
-        raw = classifier(item.text)
+        raw = clf(item.text)
 
         if not raw:
             logger.warning("Model returned empty response")
             raise HTTPException(
-                status_code=status.HTTP_204_NO_CONTENT,
-                detail="Model produced no results"
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Model produced no results",
             )
 
         return _to_predict_response(raw)
-
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
-        # Явный 500/503 без сырых traceback
+        logger.error("Prediction error: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during model inference"
-        )
+            detail="An error occurred during model inference",
+        ) from None
