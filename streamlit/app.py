@@ -9,7 +9,7 @@ import httpx
 import streamlit as st
 from dotenv import load_dotenv
 
-from utils import build_url, is_valid_url, extract_fastapi_error 
+from utils import build_url, extract_fastapi_error 
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
