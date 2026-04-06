@@ -19,6 +19,8 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.lint.isort]
 # Папки fastapi/ и streamlit/ в корне — не пакеты PyPI; иначе isort путает их с lib fastapi/streamlit.
 known-third-party = ["fastapi", "streamlit"]
+# Локальный модуль streamlit/utils.py — не пакет PyPI.
+known-first-party = ["utils"]
 
 [tool.ruff.lint.per-file-ignores]
 # FastAPI шаблон: Depends в объявлении параметра — нормальная практика фреймворка
