@@ -159,4 +159,4 @@ def predict(item: PredictRequest, clf=Depends(get_classifier)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred during model inference",
-        )
+        ) from None
