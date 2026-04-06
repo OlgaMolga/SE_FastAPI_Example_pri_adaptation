@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel, Field
 from transformers import pipeline
 
@@ -43,7 +43,16 @@ def _build_classifier():
 
 
 app = FastAPI()
-classifier = _build_classifier()
+
+_classifier = None
+
+
+def get_classifier():
+    """Ленивая загрузка pipeline: импорт приложения не тянет модель (тесты, CI)."""
+    global _classifier
+    if _classifier is None:
+        _classifier = _build_classifier()
+    return _classifier
 
 
 @app.get("/")
@@ -57,6 +66,6 @@ def health():
 
 
 @app.post("/predict/", response_model=PredictResponse)
-def predict(item: PredictRequest):
-    raw = classifier(item.text)
+def predict(item: PredictRequest, clf=Depends(get_classifier)):
+    raw = clf(item.text)
     return _to_predict_response(raw)
