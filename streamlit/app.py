@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
 import httpx
 import streamlit as st
+from dotenv import load_dotenv
 
 from utils import build_url, extract_fastapi_error
 
