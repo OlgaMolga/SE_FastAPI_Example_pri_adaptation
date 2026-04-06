@@ -9,6 +9,8 @@ import httpx
 import streamlit as st
 from dotenv import load_dotenv
 
+from utils import build_url, extract_fastapi_error 
+
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 DEFAULT_API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000").strip()
@@ -27,12 +29,14 @@ def handle_request(url: str, text: str):
     try:
         return fetch_prediction(url, text)
     except httpx.HTTPStatusError as exc:
-        st.error(f"HTTP {exc.response.status_code}")
+        msg = extract_fastapi_error(exc.response)
+        st.error(f"Ошибка API: {msg}")
+    except httpx.ConnectError:
+        st.error("Не удалось подключиться к API. Проверьте URL и что сервис запущен.")
+    except httpx.TimeoutException:
+        st.error("Превышено время ожидания ответа от API.")
     except httpx.RequestError as exc:
-        st.error(
-            f"Не удалось достучаться до API ({exc!s}). "
-            "Проверьте, что сервис запущен и URL верный."
-        )
+        st.error(f"Сетевая ошибка: {exc!s}")
     return None
 
 def render_prediction(data):
@@ -46,15 +50,17 @@ def render_prediction(data):
         rows = data
 
     if rows:
-        row = rows[0]
-        if isinstance(row, dict):
-            label = row.get("label")
-            score = row.get("score")
-            if label is not None:
-                st.metric("Метка", str(label))
-            if score is not None:
-                st.metric("Уверенность", f"{float(score):.4f}")
-            return
+        st.subheader("Результаты")
+        for row in rows:
+            if isinstance(row, dict):
+                label = row.get("label")
+                score = row.get("score")
+                cols = st.columns(2)
+                if label is not None:
+                    cols[0].metric("Метка", str(label))
+                if score is not None:
+                    cols[1].metric("Уверенность", f"{float(score):.4f}")
+        return
 
     if isinstance(data, dict):
         st.json(data)
@@ -81,10 +87,6 @@ def main() -> None:
         layout="centered",
     )
     st.title("Анализ тональности")
-    st.caption(
-        "Сначала запустите API (см. корневой ReadMe.MD). "
-        "Только Streamlit — см. README.md в этой папке; URL API задаётся в .env или в поле ниже."
-    )
 
     api_base = render_sidebar()
 
@@ -96,13 +98,19 @@ def main() -> None:
 
     submitted = st.button("Отправить", type="primary")
 
-    if submitted and not is_valid_text(text):
-        st.warning("Введите непустой текст.")
+    if submitted:
+        if not is_valid_text(text):
+            st.warning("Введите непустой текст.")
+            return
 
-    if submitted and is_valid_text(text):
-        url = api_base.rstrip("/") + PREDICT_PATH
+        url = build_url(api_base, PREDICT_PATH) 
+        if not url:
+            st.error("Некорректный URL API. Проверьте формат (например, http://127.0.0.1:8000).")
+            return
 
-        payload = handle_request(url, text)
+        with st.spinner("Отправка запроса..."):
+            payload = handle_request(url, text)
+
         if payload is None:
             return
 
