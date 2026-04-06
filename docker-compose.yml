@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: ./fastapi
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Пусто или имя модели HF — см. fastapi/.env.example
+      SENTIMENT_MODEL: ""
+
+  web:
+    build:
+      context: ./streamlit
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
